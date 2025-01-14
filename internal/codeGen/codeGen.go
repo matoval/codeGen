@@ -2,6 +2,8 @@ package codegen
 
 import (
 	"bytes"
+	codesandbox "codeGen/internal/codeSandbox"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,7 +25,7 @@ type OllamaResponse struct {
 	Done bool `json:"done"`
 }
 
-func promptCodeLlama(prompt string) string{
+func promptCodeLlama(ctx context.Context, prompt string) string{
 	data := RequestData{
 		Model: "codellama",
 		Prompt: fmt.Sprintf("%s Only respond with a full go file of code to resolve this question. Never respond with text that isn't part of the golang file used to resolve prompt.", prompt),
@@ -32,24 +34,31 @@ func promptCodeLlama(prompt string) string{
 
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		panic(err)
+		fmt.Printf("ERROR: %v", err.Error())
 	}
 
-	resp, err := http.Post("http://192.168.1.52:11434/api/generate", "application/json", bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", "http://192.168.1.52:11434/api/generate", bytes.NewBuffer(jsonData))
 	if err != nil {
-		panic(err)
+		fmt.Printf("ERROR: %v", err.Error())
 	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("ERROR: %v", err.Error())
+	}
+
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		panic(err)
+		fmt.Printf("ERROR: %v", err.Error())
 	}
 
 	var ollamaResponse OllamaResponse
 	err = json.Unmarshal(body, &ollamaResponse)
 	if err != nil {
-		panic(err)
+		fmt.Printf("ERROR: %v", err.Error())
 	}
 
 	if resp.Status == "200 OK" {
@@ -59,29 +68,30 @@ func promptCodeLlama(prompt string) string{
 	return ""
 }
 
-func CodeGen() {
+func CodeGen(ctx context.Context) {
 	prompt := "can you create a golang function that adds two numbers?"
 
 	testPrompt := fmt.Sprintf("Using the prompt: %s, create just the test to ensure the code to solve this works correctly.", prompt)
 	
-	testPromptResult := promptCodeLlama(testPrompt)
-	createFile( "./add_test.go", strings.Split(testPromptResult, "```")[1])
+	testPromptResult := promptCodeLlama(ctx, testPrompt)
+	codesandbox.AddFileToSandbox("./add_test.go", strings.Split(testPromptResult, "```")[1])
 	fmt.Println(testPromptResult)
 	codePrompt := fmt.Sprintf("Using this test file: %s, resolve this prompt %s", testPromptResult, prompt)
-	codePromptResult := promptCodeLlama(codePrompt)
-	createFile("./add.go", strings.Split(codePromptResult, "```")[1])
+	codePromptResult := promptCodeLlama(ctx, codePrompt)
+	codesandbox.AddFileToSandbox("./add.go", strings.Split(codePromptResult, "```")[1])
 	fmt.Println(codePromptResult)
+	return
 }
 
 func createFile(fileName string, content string) {
 	file, err := os.OpenFile(fileName, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		panic(err)
+		fmt.Printf("ERROR: %v", err.Error())
 	}
 	defer file.Close()
 
 	_, err = file.WriteString(content)
 	if err != nil {
-		panic(err)
+		fmt.Printf("ERROR: %v", err.Error())
 	}
 }
