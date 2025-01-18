@@ -1,6 +1,7 @@
 package codesandbox
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/pkg/stdcopy"
 )
 
 var ContainerID string
@@ -89,7 +91,7 @@ func setupGoPackage() {
 	return
 }
 
-func RemoveContainer(cli *client.Client, ctx context.Context) {
+func RemoveContainer(ctx context.Context, cli *client.Client) {
 	<-ctx.Done()
 
 	removeOptions := container.RemoveOptions{
@@ -105,6 +107,37 @@ func RemoveContainer(cli *client.Client, ctx context.Context) {
 	fmt.Printf("container %v removed successfully.\n", ContainerID)
 }
 
-func AddFileToSandbox(fileName string, content string) {
+func AddFileToSandbox(ctx context.Context, cli *client.Client, fileName string, content string) {
 	fmt.Println(ContainerID)
+	cmd := []string{"sh", "-c", fmt.Sprintf("cd codeSandbox && echo %s > %s", content, fileName)}
+
+	execCreateResponse, err := cli.ContainerExecCreate(ctx, ContainerID, container.ExecOptions{
+		Cmd: cmd,
+		Tty: false,
+		AttachStdout: true,
+		AttachStderr: true,	
+	})
+	if err != nil {
+		fmt.Printf("failed to create exec to container with error: %v", err)
+	}
+
+	execStartResponse, err := cli.ContainerExecAttach(ctx, execCreateResponse.ID, container.ExecStartOptions{
+		Detach: false,
+		Tty: false,
+	})
+	if err != nil {
+		fmt.Printf("failed to attach to exec instance with error: %v", err)
+	}
+	defer execStartResponse.Close()
+
+	var stdout, stderr bytes.Buffer
+	_, err = stdcopy.StdCopy(&stdout, &stderr, execStartResponse.Reader)
+	if err != nil {
+		fmt.Printf("Error reading output: %v", err)
+	}
+
+	if stderr.Len() > 0 {
+		fmt.Printf("stderr: %s", stderr.String())
+	}
+	fmt.Printf("stdout: %s", stdout.String())
 }

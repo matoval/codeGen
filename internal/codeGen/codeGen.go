@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/docker/docker/client"
 )
 
 type RequestData struct {
@@ -28,7 +30,7 @@ type OllamaResponse struct {
 func promptCodeLlama(ctx context.Context, prompt string) string{
 	data := RequestData{
 		Model: "codellama",
-		Prompt: fmt.Sprintf("%s Only respond with a full go file of code to resolve this question. Never respond with text that isn't part of the golang file used to resolve prompt.", prompt),
+		Prompt: fmt.Sprintf("%s Only respond with a full go file of code to resolve this question. Never respond with text that isn't part of the golang file used to resolve prompt. No explanations or comments. Do not add 'go' the the triple backticks of the response.", prompt),
 		Stream: false,
 	}
 
@@ -68,17 +70,17 @@ func promptCodeLlama(ctx context.Context, prompt string) string{
 	return ""
 }
 
-func CodeGen(ctx context.Context) {
+func CodeGen(ctx context.Context, cli *client.Client) {
 	prompt := "can you create a golang function that adds two numbers?"
 
 	testPrompt := fmt.Sprintf("Using the prompt: %s, create just the test to ensure the code to solve this works correctly.", prompt)
 	
 	testPromptResult := promptCodeLlama(ctx, testPrompt)
-	codesandbox.AddFileToSandbox("./add_test.go", strings.Split(testPromptResult, "```")[1])
+	codesandbox.AddFileToSandbox(ctx, cli, "./add_test.go", strings.Split(testPromptResult, "```")[1])
 	fmt.Println(testPromptResult)
 	codePrompt := fmt.Sprintf("Using this test file: %s, resolve this prompt %s", testPromptResult, prompt)
 	codePromptResult := promptCodeLlama(ctx, codePrompt)
-	codesandbox.AddFileToSandbox("./add.go", strings.Split(codePromptResult, "```")[1])
+	codesandbox.AddFileToSandbox(ctx, cli, "./add.go", strings.Split(codePromptResult, "```")[1])
 	fmt.Println(codePromptResult)
 	return
 }

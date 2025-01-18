@@ -24,11 +24,11 @@ func main() {
 	}()
 
 	cli := codesandbox.CreateCodeSandbox(ctx)
-	codegen.CodeGen(ctx)
+	codegen.CodeGen(ctx, cli)
 
 	select {
 	case <-ctx.Done():
-		codesandbox.RemoveContainer(cli, ctx)
+		codesandbox.RemoveContainer(ctx, cli)
 	}
 
 }
