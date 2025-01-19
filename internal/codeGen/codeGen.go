@@ -71,7 +71,7 @@ func promptCodeLlama(prompt string) string{
 }
 
 func CodeGen() {
-	codePrompt := "can you write a golang rest api that is used for user to sign-up and login to accounts?"
+	codePrompt := "can you write a simple go rest api?"
 
 	codePromptResult := promptCodeLlama(codePrompt)
 	
